@@ -1,11 +1,11 @@
-data = LOAD '$INPUT/data.csv' using PigStorage('-') as (ID,Day,Hour,User,Text);
+data = LOAD 'input/input.txt' using PigStorage('-') as (Day,Hour,User,Text);
 data_words = foreach data generate Day, Hour, FLATTEN(TOKENIZE(REPLACE(LOWER(TRIM(Text)),'[\\p{Punct},\\p{Cntrl}]',''))) as word;
 g = group data_words by (Day, Hour, word);
 g_flatten = foreach g {
     generate flatten(group), COUNT(data_words) as Count;
 };
 
-positive_words = load '$INPUT/positive-words.txt' as (word);
+positive_words = load 'input/positive-words.txt' as (word);
 positive_join = JOIN g_flatten by group::word, positive_words by word;
 positive_join_projection = foreach positive_join generate g_flatten::group::Day as Day, g_flatten::group::Hour as Hour, g_flatten::group::word as Word, g_flatten::Count as Count;
 
@@ -14,7 +14,7 @@ positive_sort = foreach positive_group {
     generate group, SUM(positive_join_projection.$3) as Sum;
 }
 
-negative_words = load '$INPUT/negative-words.txt' as (word);
+negative_words = load 'input/negative-words.txt' as (word);
 negative_join = JOIN g_flatten by group::word, negative_words by word;
 negative_join_projection = foreach negative_join generate g_flatten::group::Day as Day, g_flatten::group::Hour as Hour, g_flatten::group::word as Word, g_flatten::Count as Count;
 
@@ -24,7 +24,7 @@ negative_sort = foreach negative_group {
 }
 
 
-stop_words = load '$INPUT/stopwords.txt' as (word);
+stop_words = load 'input/stop-words.txt' as (word);
 diff = COGROUP g_flatten BY group::word, stop_words BY word;
 filt = FILTER diff by IsEmpty(stop_words);
 t = foreach filt generate flatten(g_flatten) as (Day, Hour, Word, Count);
@@ -41,4 +41,4 @@ stop_sort = foreach stop_group {
 total_result = JOIN positive_sort by group, negative_sort by group, stop_sort by group;
 out_result = foreach total_result generate positive_sort::group as Time, positive_sort::Sum as PositiveSum, negative_sort::Sum as NegativeSum, stop_sort::WordCounts as WordCounts;
 
-store out_result into '$OUTPUT' USING JsonStorage();
+store out_result into 'input/output.txt' USING JsonStorage();
